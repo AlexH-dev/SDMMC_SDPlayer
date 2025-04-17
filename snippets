@@ -1,8 +1,61 @@
-uint32_t getfreq(FIL* file){
-	UINT count0;
-	uint32_t freq[1];
-	f_lseek(file, 24);
-	f_read(file, freq, 4, &count0);
-	return freq[0];
-	
+void playwav(FIL* fp, FRESULT res, uint8_t index) {
+    UINT count;
+    char filename[32];
+    res = f_open(fp, "tone.wav", FA_READ);
+    
+    if(res == FR_OK) {
+        uint32_t filesize = getsize(fp);
+        f_lseek(fp, 4096); // 跳过WAV文件头
+        
+        HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
+        
+        // 初始填充两个缓冲区
+        f_read(fp, buffer_A, size*2, &count); // 读取第一个缓冲区的数据
+        f_read(fp, buffer_B, size*2, &count); // 读取第二个缓冲区的数据
+        
+        int j = 0;
+        uint8_t current_buffer = 0; // 0表示buffer_A, 1表示buffer_B
+        
+        HAL_TIM_Base_Start_IT(&htim1);
+        
+        while(1) {
+            if(timer6flag) {
+                if(j >= size) {
+                    // 当前缓冲区播放完毕，切换到另一个缓冲区
+                    if(current_buffer == 0) {
+                        // 异步读取下一块数据到buffer_A
+                        if(f_eof(fp) == 0) {
+                            f_read(fp, buffer_A, size*2, &count);
+                        }
+                        current_buffer = 1;
+                    } else {
+                        // 异步读取下一块数据到buffer_B
+                        if(f_eof(fp) == 0) {
+                            f_read(fp, buffer_B, size*2, &count);
+                        }
+                        current_buffer = 0;
+                    }
+                    j = 0;
+                    
+                    // 检查是否到达文件末尾
+                    if(f_eof(fp) && j >= size) {
+                        break;
+                    }
+                }
+                
+                // 播放当前样本
+                uint16_t dac_val;
+                if(current_buffer == 0) {
+                    dac_val = (uint16_t)((buffer_A[j] + 32768) >> 4);
+                } else {
+                    dac_val = (uint16_t)((buffer_B[j] + 32768) >> 4);
+                }
+                
+                HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, dac_val);
+                j++;
+                timer6flag = 0;
+            }
+        }
+    }
+    f_close(fp);
 }
