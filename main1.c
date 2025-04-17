@@ -57,8 +57,8 @@ UART_HandleTypeDef huart3;
 int16_t size = 2048; // size of buffer;
 int16_t buffer_A[size];
 int16_t buffer_B[size];
-int timer6flag = 0;
-uint8_t bufferflag = 0;
+int timer6flag = 1;
+uint8_t bufferflag = 1;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -74,7 +74,7 @@ static void MX_TIM1_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-// find data chunk offset
+// find sampling frequency of the .wav file
 uint32_t getfreq(FIL* file){
 	UINT count0;
 	uint32_t freq[1];
@@ -82,7 +82,15 @@ uint32_t getfreq(FIL* file){
 	f_read(file, freq, 4, &count0);
 	return freq[0];
 }
-
+// find total size of the .wav file
+uint32_t getsize(FIL* file){
+	UINT count0;
+	uint32_t size[1];
+	f_lseek(file, 4);
+	f_read(file, freq, 4, &count0);
+	return size[0];
+}
+// find data chunk offset
 uint32_t find_data_offset(FIL *file) {
     uint8_t buffer[12];
     UINT bytes_read;
@@ -104,71 +112,42 @@ uint32_t find_data_offset(FIL *file) {
 void playwav(FIL* fp,FRESULT res,uint8_t index){
 	UINT count;
 	char filename[32];
-
+        //enabling file choosing function
 	//sprintf(filename, "tone.wav", index);
+	//res = f_open(fp, filename, FA_READ);
 	res = f_open(fp, "tone.wav", FA_READ);
-  	   if(res == FR_OK){
-  		   uint32_t freq = getfreq(fp);
-  		   f_lseek(fp, 4096*6);
-  		   //UINT offset;
-  		   //offset = find_data_offset(fp);
-  		   //f_lseek(fp, offset);// jump to the end of header  // replaced by auto omit first 4096 bytes
-  		   HAL_TIM_Base_Start_IT(&htim1);
-  		   HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
-  		   if(bufferflag = 0){
-  		   for(int buff_index = 0; buff_index<100;buff_index++){
-           f_read(fp, buffer_A, 4096, &count);
-           int j = 0;
-           while(1){
+  	if(res == FR_OK){
+  		uint32_t filesize = getsize(fp);
+  		f_lseek(fp, 4096);
+  		//UINT offset;
+  		//offset = find_data_offset(fp);
+  		//f_lseek(fp, offset);// jump to the end of header  // replaced by auto omit first 4096 bytes
+  		
+  		HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
+           	f_read(fp, buffer_A, 4096, &count);
+           	int j = 0;
+           
+		while(1){
+		   HAL_TIM_Base_Start_IT(&htim1);
            	   if(timer6flag && j<size){
            			   uint16_t dac_val = (uint16_t)((buffer_A[j] + 32768) >> 4); // Convert 16-bit PCM to 12-bit unsigned
            			   HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, dac_val);
            			   timer6flag = 0;
            			   ++j;
-           	      }
+           	        }
            	   else if(j>=size){
-           		   bufferflag = 1;
+           
            		   break;
-           	   }
-              }
-  		  }
-  		  }
-  		   else if(bufferflag = 1){
-  		   		   for(int buff_index = 0; buff_index<100;buff_index++){
-  		            f_read(fp, buffer_B, 4096, &count);
-  		            int j = 0;
-  		            while(1){
-  		            	   if(timer6flag && j<size){
-  		            			   uint16_t dac_val = (uint16_t)((buffer_B[j] + 32768) >> 4); // Convert 16-bit PCM to 12-bit unsigned
-  		            			   HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, dac_val);
-  		            			   timer6flag = 0;
-  		            			   ++j;
-  		            	      }
-  		            	   else if(j>=size){
-  		            		   bufferflag = 0;
-  		            		   break;
-  		            	   }
-  		               }
-  		   		  }
-  		   		  }
-          f_close(fp);
-  	  }
+           	   	}
+              	  }
+  		
+  		  
+	}
+    	f_close(fp);
+  	  
 }
 
-void play_sine_table(void) {
-    HAL_TIM_Base_Start_IT(&htim1);
-    HAL_DAC_Start(&hdac1, DAC_CHANNEL_1);
-    while(1){
-    for (uint32_t i = 0; i < SINE_TABLE_SIZE; ++i) {
-        while (!timer6flag);  // Wait for timer flag
-        HAL_DAC_SetValue(&hdac1, DAC_CHANNEL_1, DAC_ALIGN_12B_R, sine_table[i]);
-        timer6flag = 0;
-    }
-    }
 
-    HAL_DAC_Stop(&hdac1, DAC_CHANNEL_1);
-    HAL_TIM_Base_Stop_IT(&htim1);
-}
 
 /* USER CODE END 0 */
 
