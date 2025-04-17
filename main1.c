@@ -55,8 +55,8 @@ UART_HandleTypeDef huart3;
 
 /* USER CODE BEGIN PV */
 int16_t size = 2048; // size of buffer;
-int16_t buffer_A[2048];
-int16_t buffer_B[2048];
+int16_t buffer_A[size];
+int16_t buffer_B[size];
 int timer6flag = 0;
 uint8_t bufferflag = 0;
 /* USER CODE END PV */
