@@ -87,7 +87,7 @@ uint32_t getsize(FIL* file){
 	UINT count0;
 	uint32_t size[1];
 	f_lseek(file, 4);
-	f_read(file, freq, 4, &count0);
+	f_read(file, size, 4, &count0);
 	return size[0];
 }
 // find data chunk offset
